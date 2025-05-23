@@ -4,82 +4,64 @@ import asyncHandler from "../middlewares/asyncHandler.js";
 import generateToken from "../utils/createToken.js";
 
 
-//fucntion to create a user
 const createUser = asyncHandler(async (req, res) => {
-    //get data form front end
     const { username, email, password } = req.body;
 
-    //data validatinn
     if (!username || !email || !password) {
-        throw new Error(" All the fields are requireds, Please filed all the inputs")
-
+        return res.status(400).json({ message: "Please fill all the inputs." });
     }
 
     const userExists = await User.findOne({ email });
-
     if (userExists) {
-        res.status(400).json({ message: "Emaile is alredy been used" })
+        return res.status(400).json({ message: "User already exists" });
     }
 
-    //hash our passowd using bcryptjs
-    const salt = await bcrypt.genSalt(10)
-    const hashedPassword = await bcrypt.hash(password, salt)
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+    const newUser = new User({ username, email, password: hashedPassword });
 
-    //creating a new user
-    const newUser = new User({ username, email, password: hashedPassword })
-
-    //error handlaing while savign a new user
     try {
-        //save the new user
-        await newUser.save()
-
-        generateToken(res, newUser._id)
+        await newUser.save();
+        generateToken(res, newUser._id);
 
         res.status(201).json({
             _id: newUser._id,
             username: newUser.username,
             email: newUser.email,
-            isAdmin: newUser.isAdmin
-        })
-    } catch (error) {
-        //throw error if something went worong while creating a new user
-        res.status(400)
-        throw new Error("invlid user data")
+            isAdmin: newUser.isAdmin,
+        });    } catch (error) {
+        return res.status(400).json({ 
+            message: "Invalid user data",
+            error: error.message 
+        });
     }
-
 });
 
-
-// Function to login user
 const loginUser = asyncHandler(async (req, res) => {
     const { email, password } = req.body;
 
-    // Validate input
     if (!email || !password) {
-        res.status(400);
-        throw new Error("Both fields are required. Please enter both email and password.");
+        return res.status(400).json({ message: "Please provide email and password" });
     }
 
-    // Find user by email
     const existingUser = await User.findOne({ email });
 
     if (!existingUser) {
-        res.status(401);
-        throw new Error("Invalid email or password.");
+        return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    // Compare passwords
-    const isPasswordValid = await bcrypt.compare(password, existingUser.password);
+    const isPasswordValid = await bcrypt.compare(
+        password,
+        existingUser.password
+    );
 
     if (!isPasswordValid) {
-        res.status(401);
-        throw new Error("Invalid email or password.");
+        return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    // Generate token and send response
     generateToken(res, existingUser._id);
 
-    res.status(200).json({
+    return res.status(200).json({
         _id: existingUser._id,
         username: existingUser.username,
         email: existingUser.email,
@@ -87,17 +69,40 @@ const loginUser = asyncHandler(async (req, res) => {
     });
 });
 
-
-//logout user 
-const logoutUser = asyncHandler(async(req, res)=>{
+const logoutCurrentUser = asyncHandler(async (req, res) => {
     res.cookie("jwt", "", {
         httpOnly: true,
-        expires: new Date(0)
-    })
+        secure: process.env.NODE_ENV !== 'development',
+        sameSite: 'strict',
+        expires: new Date(0),
+    });
 
-    res.status(200).json({message: "User Logout Succesfully"})
+    res.status(200).json({ message: "Logged out successfully" });
+});
 
+const getAllUsers = asyncHandler(async (req, res) => {
+    const users = await User.find({});
+    res.json(users);
+});
+
+//get current user 
+const getCurrentUserProfile = asyncHandler(async(req, res)=>{
+    if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const user = await User.findById(req.user._id);
+
+    if(user){
+        res.json({
+            _id: user._id,
+            username: user.username,
+            email: user.email,
+            isAdmin: user.isAdmin
+        });
+    } else {
+        res.status(404).json({ message: "User not found" });
+    }
 })
 
-
-export { createUser, loginUser, logoutUser };
+export { createUser, loginUser, logoutCurrentUser, getAllUsers, getCurrentUserProfile};
