@@ -1,5 +1,5 @@
 import express from "express"
-import { createUser, loginUser, logoutCurrentUser, getAllUsers, getCurrentUserProfile } from '../controllers/userController.js';
+import { createUser, loginUser, logoutCurrentUser, getAllUsers, getCurrentUserProfile, updateCurrentUserProfile } from '../controllers/userController.js';
 import { authenticate, authorizeAdmin } from '../middlewares/authMiddleware.js'
 
 //creating a router using express 
@@ -16,7 +16,7 @@ router.route('/auth').post(loginUser)
 router.route('/logout').post(logoutCurrentUser)
 router.route('/get-all-users').get(getAllUsers)
 
-router.route('/profile').get(authenticate, getCurrentUserProfile)
+router.route('/profile').get(authenticate, getCurrentUserProfile).put(authenticate, updateCurrentUserProfile)
 
 
 
